@@ -80,5 +80,7 @@ class mKPGM:
         self.igraph.add_edges(self.edges)
 
     def write_igraph(self, filepath):
-        self.igraph.write_pickle(filepath)
+        if not self.igraph:
+            self.create_igraph()
 
+        self.igraph.write_pickle(filepath)
