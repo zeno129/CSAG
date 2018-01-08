@@ -13,12 +13,11 @@ import random
 
 class KPGM:
     def __init__(self, theta, K, b):
-        # Create igraph
-        self.igraph = igraph.Graph()
+        # Empty igraph
+        self.igraph = None
 
         # Add vertices
         self.vertices = operator.pow(b, K)
-        self.igraph.add_vertices(self.vertices)
 
         edges = []
 
@@ -59,36 +58,22 @@ class KPGM:
                 # For some reason, resulting edges start at index 9, not 0?
                 edges.append((u-K, v-K))
 
-                # print("u=%s\tv=%s" % (u-1, v-1))
-                # g.add_edge(u-1, v-1)
-
                 countEdge += 1 + floor(np.log(1 - np.random.uniform(0, 1)) / np.log(1 - pi_prime_k))
 
-        # Add edges to igraph
-        self.igraph.add_edges(edges)
         self.edges = edges
 
+    def create_igraph(self):
+        # Empty igraph
+        self.igraph = igraph.Graph()
+
+        # Add vertices
+        self.igraph.add_vertices(self.vertices)
+
+        # Add edges to igraph
+        self.igraph.add_edges(self.edges)
+
     def write_igraph(self, filepath):
+        if not self.igraph:
+            self.create_igraph()
+
         self.igraph.write_pickle(filepath)
-
-if __name__ == '__main__':
-    my_b = 2
-    # my_K = 10
-    my_K = 2
-    # my_theta = [[0.99, 0.55], [0.55, 0.75]]
-    my_theta = [[0, 1], [0, 1]]
-    graph = KPGM(my_theta, my_K, my_b)
-
-    print(graph.edges)
-
-    # out_dir = '/Users/giselle/Development/research/gen_data'
-    # filename = '20171203_graph-b_%s-K_%s.pkl' % (my_b, my_K)
-    #
-    # d = os.path.dirname(out_dir)
-    # if not os.path.exists(d):
-    #     os.makedirs(d)
-    #
-    # filepath = os.path.join(out_dir, filename)
-    #
-    # graph.write_igraph(filepath)
-
