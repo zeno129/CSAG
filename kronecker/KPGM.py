@@ -73,18 +73,22 @@ class KPGM:
 
 if __name__ == '__main__':
     my_b = 2
-    my_K = 10
-    my_theta = [[0.99, 0.55], [0.55, 0.75]]
+    # my_K = 10
+    my_K = 2
+    # my_theta = [[0.99, 0.55], [0.55, 0.75]]
+    my_theta = [[0, 1], [0, 1]]
     graph = KPGM(my_theta, my_K, my_b)
 
-    out_dir = '/Users/giselle/Development/research/gen_data'
-    filename = '20171203_graph-b_%s-K_%s.pkl' % (my_b, my_K)
+    print(graph.edges)
 
-    d = os.path.dirname(out_dir)
-    if not os.path.exists(d):
-        os.makedirs(d)
-
-    filepath = os.path.join(out_dir, filename)
-
-    graph.write_igraph(filepath)
+    # out_dir = '/Users/giselle/Development/research/gen_data'
+    # filename = '20171203_graph-b_%s-K_%s.pkl' % (my_b, my_K)
+    #
+    # d = os.path.dirname(out_dir)
+    # if not os.path.exists(d):
+    #     os.makedirs(d)
+    #
+    # filepath = os.path.join(out_dir, filename)
+    #
+    # graph.write_igraph(filepath)
 
