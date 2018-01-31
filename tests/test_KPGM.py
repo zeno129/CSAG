@@ -60,7 +60,6 @@ def test_diff_probabilities_edges():
         assert cnt <= mean + variance
 
 
-# TODO: Figure out why KPGM not producing random graphs
 def test_random_graph_clustering():
     b = 2
     prob = 0.65
@@ -109,6 +108,7 @@ def test_random_graph_clustering():
 
     assert p <= mean + 0.1 and p >= mean - 0.1
 
+
 def test_random_graph_density():
     b = 2
     prob = 0.65
@@ -139,3 +139,32 @@ def test_random_graph_density():
     mean = np.round(np.mean(densities), decimals=2)
 
     assert p <= mean + 0.025 and p >= mean - 0.025
+
+
+def test_different_probabilities_avg_edges():
+    b = 2
+    k = 2
+    theta = [[0.7, 0.4], [0.4, 0.5]]
+    vertices = range(operator.pow(b, k))
+    n = 100
+
+    possible_edges = list(itertools.product(vertices, repeat=2))
+    counts = {edge: 0 for edge in possible_edges}
+
+    for i in range(n):
+        g = model.KPGM(theta, k, b)
+        for e in possible_edges:
+            if e in g.edges:
+                counts[e] += 1
+
+    S = sum(theta[0]) + sum(theta[1])
+    S_2 = np.square(theta[0][0]) + np.square(theta[0][1]) \
+        + np.square(theta[1][0]) + np.square(theta[1][1])
+
+    exp_num_edges = np.power(S, k)
+    var_num_edges = np.power(S, k) - np.power(S_2, k)
+
+    avg_edges = float(sum(counts.values()))/n
+
+    assert avg_edges >= exp_num_edges - var_num_edges
+    assert avg_edges <= exp_num_edges + var_num_edges
