@@ -1,12 +1,7 @@
 from __future__ import division
 import igraph
-import scipy.io as sio
-import os, sys
-import pickle
-import itertools
-from math import factorial, floor
+from math import floor
 import operator
-import functools
 import numpy as np
 import random
 from KPGM import KPGM

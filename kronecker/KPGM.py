@@ -1,8 +1,5 @@
 from __future__ import division
 import igraph
-import scipy.io as sio
-import os, sys
-import pickle
 import itertools
 from math import factorial, floor
 import operator
