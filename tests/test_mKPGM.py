@@ -1,6 +1,5 @@
-import pytest
+# import pytest
 import itertools
-import sys
 import operator
 import numpy as np
 from kronecker import mKPGM as model
