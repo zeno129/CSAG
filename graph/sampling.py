@@ -3,7 +3,7 @@ from scipy.stats.stats import pearsonr
 from kronecker import mKPGM as model
 
 
-def graph_sampling(graphIn, xIn, model, epsilon):
+def graph_sampling(graphIn, xIn, model, epsilon, f_x, sample_x):
     """
     Graph Sampling algorithm
 
@@ -11,30 +11,26 @@ def graph_sampling(graphIn, xIn, model, epsilon):
     :param xIn: node attributes for graphIn
     :param model: generative network model
     :param epsilon: error
-    :return: graphOut (graph), xOut (attributes), rhoOut (correlation)
+    :param f_x: function to learn thetaX parameters for P(X)
+    :param sample_x: function to sample from P(X|theta^X)
+    :return:
+        :graphOut: graph
+        :xOut: attributes
+        :rhoOut: correlation
     """
 
     verticesIn, edgesIn = graphIn
 
     # model = ??? -- is this just b and l? ...since theta and K can be learned
 
-    # TODO: (1) learn parameters (phi, beta, thetaX, thetaG)
-    # phi - edge types
-    # beta - fraction of edges of each type
-    # thetaX - parameters for marginal distribution of node attributes P(X);
-    #          Ex. MLE for Bernoulli trials
-    # thetaG - parameters for marginal distribution of network structure P(G);
-    #          Ex. mKPGM parameters
-
-    # Initial version (random)
+    # (1) learn parameters
+    phi, beta, thetaX, thetaG = learn_parameters(graphIn, xIn, model, f_x)
 
 
-    # TODO: (2) sample node attributes xOut from P(X|theta^X)
-    # Initial version (random)
-    # binary class --> Bernoulli trials
-    # xOut = np.random.binomial(len(verticesIn), 0.5)
-    xOut = np.random.randint(2, size=len(verticesIn))
-    thetaG = [[0.7, 0.4], [0.4, 0.5]]
+    # (2) sample node attributes xOut from P(X|theta^X)
+    xOut = sample_x(thetaX)
+
+    # thetaG = [[0.7, 0.4], [0.4, 0.5]]
     # graphOut = model.mKPGM(thetaG, K=5, b=2, l=2)
 
 
@@ -57,6 +53,30 @@ def graph_sampling(graphIn, xIn, model, epsilon):
 
     # return graphOut, xOut
     return graphIn, xOut
+
+
+def learn_parameters(graphIn, xIn, model, f_x):
+    """
+
+    :param graphIn: tuple with set of vertices and edges
+    :param xIn: node attributes for graphIn
+    :param model: generative network model
+    :return:
+        :phi: list of tuples with edge types
+                (e.g., (0,0), (0,1), (1,1))
+        :beta: dictionary with fraction of edges of each type
+        :thetaX: parameters for marginal distribution of node attributes P(X);
+                   Ex. MLE for Bernoulli trials
+        :thetaG: parameters for marginal distribution of network structure P(G);
+                   Ex. mKPGM parameters
+    """
+    # TODO: (1) learn parameters (phi, beta, thetaX, thetaG)
+    phi = None
+    beta = None
+    thetaX = f_x(xIn)
+    thetaG = [[0.7, 0.4], [0.4, 0.5]]
+
+    return phi, beta, thetaX, thetaG
 
 
 def ME_edge_sampling(model, theta, psy, beta):
