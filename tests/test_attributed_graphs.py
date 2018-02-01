@@ -23,7 +23,7 @@ def test_graph_sampling():
 
 
 def f_x(xIn):
-    # return (2, xIn)
+    # TODO: (1) learn parameters thetaX
     return {"low": 2, "size": xIn}
 
 

@@ -45,6 +45,7 @@ def graph_sampling(graphIn, xIn, model, epsilon, f_x, sample_x):
 
     # TODO: (9) calculate rhoOut
     # Initial version
+    # TODO: use graphOut.edges
     # rhoOut = calc_correlation(graphOut.edges, xOut)
     rhoOut = calc_correlation(edgesIn, xOut)
 
@@ -79,8 +80,34 @@ def learn_parameters(graphIn, xIn, model, f_x):
     return phi, beta, thetaX, thetaG
 
 
-def ME_edge_sampling(model, theta, psy, beta):
+def ME_edge_sampling(model, thetaG, phi, beta):
+    """
+
+    :param model: generative network model
+    :param thetaG: parameters for marginal distribution of network structure P(G)
+    :param phi: list of tuples with edge types
+    :param beta: dictionary with fraction of edges of each type
+    :return:
+        :graphOut: output graph; tuple (num of vertices, list of edge tuples)
+    """
+    # TODO: ME_edge_sampling
     pass
+
+
+def LPBlockSearch(model, thetaG, blockSample_l, phi, beta):
+    """
+
+    :param model: generative network model
+    :param thetaG: parameters for marginal distribution of network structure P(G)
+    :param blockSample_l: matrix with block probabilities?
+    :param phi: list of tuples with edge types
+    :param beta: dictionary with fraction of edges of each type
+    :return:
+        :blockSample_lPlus1: sampled blocks in l+1
+    """
+    # TODO: LPBlockSearch
+    pass
+
 
 def calc_correlation(edges, labels):
     '''
