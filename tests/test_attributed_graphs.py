@@ -5,11 +5,11 @@ from kronecker import mKPGM as model
 from graph import sampling
 
 
-def test_graph_sampling():
+def test_graph_sampling_binomial():
     """
     Test dumb version:
-    Create graph and get random attributes back
-    :return:
+    Create graph and get random attributes back.
+    Use binomial distribution.
     """
     b = 2
     k = 5
@@ -17,28 +17,12 @@ def test_graph_sampling():
     theta = [[0.7, 0.4], [0.4, 0.5]]
     g = model.mKPGM(theta, k, b, l)
 
-    _, attributes = sampling.graph_sampling((range(g.vertices), g.edges), g.vertices, None, None, f_x, sample_x)
+    x = list(np.random.random_integers(low=0, high=1, size=g.vertices))
+
+    _, attributes = sampling.graph_sampling(graphIn=(range(g.vertices), g.edges),
+                                            xIn=x,
+                                            model=None,
+                                            epsilon=0.0,
+                                            distribution="binomial")
 
     assert len(attributes) == g.vertices
-
-
-def f_x(xIn):
-    # TODO: (1) learn parameters thetaX
-    return {"low": 2, "size": xIn}
-
-
-def sample_x(thetaX):
-    """
-    Sample node attributes xOut from P(X|theta^X)
-
-    :param n: num of attributes to generate
-    :return:
-    """
-    # TODO: (2) sample node attributes xOut from P(X|theta^X)
-
-    # Initial version (random)
-    # binary class --> Bernoulli trials, p=0.5
-    # xOut = np.random.randint(2, size=len(verticesIn))
-    xOut = np.random.randint(**thetaX)
-
-    return xOut

@@ -3,20 +3,27 @@ from scipy.stats.stats import pearsonr
 from kronecker import mKPGM as model
 
 
-def graph_sampling(graphIn, xIn, model, epsilon, f_x, sample_x):
+def graph_sampling(graphIn, xIn, model, epsilon, distribution):
     """
     Graph Sampling algorithm
 
-    :param graphIn: tuple with set of vertices and edges
+    :param graphIn: contains list of vertices and list of edges
+    :type graphIn: tuple
+
     :param xIn: node attributes for graphIn
+    :type xIn: list
+
     :param model: generative network model
+    :type model:
+
     :param epsilon: error
-    :param f_x: function to learn thetaX parameters for P(X)
-    :param sample_x: function to sample from P(X|theta^X)
-    :return:
-        :graphOut: graph
-        :xOut: attributes
-        :rhoOut: correlation
+    :type epsilon: float
+
+    :param distribution: "binomial" or "multinomial:
+    :type distribution: String
+    
+    :return: graphOut (graph), xOut (attributes), rhoOut (correlation)
+    :rtype: tuple, list, float
     """
 
     verticesIn, edgesIn = graphIn
@@ -24,11 +31,12 @@ def graph_sampling(graphIn, xIn, model, epsilon, f_x, sample_x):
     # model = ??? -- is this just b and l? ...since theta and K can be learned
 
     # (1) learn parameters
-    phi, beta, thetaX, thetaG = learn_parameters(graphIn, xIn, model, f_x)
+    phi, beta, thetaX, thetaG = learn_parameters(graphIn, xIn, model, distribution)
 
 
-    # (2) sample node attributes xOut from P(X|theta^X)
-    xOut = sample_x(thetaX)
+    # (2) sample node attributes xOut from P(X|thetaX)
+    # TODO: change to number of vertices in graphOut
+    xOut = sample_x(thetaX, distribution, len(verticesIn))
 
     # thetaG = [[0.7, 0.4], [0.4, 0.5]]
     # graphOut = model.mKPGM(thetaG, K=5, b=2, l=2)
@@ -56,28 +64,93 @@ def graph_sampling(graphIn, xIn, model, epsilon, f_x, sample_x):
     return graphIn, xOut
 
 
-def learn_parameters(graphIn, xIn, model, f_x):
+def learn_parameters(graphIn, xIn, model, distribution):
     """
 
-    :param graphIn: tuple with set of vertices and edges
+    :param graphIn: contains list of vertices and edges
+    :type graphIn: tuple
+
     :param xIn: node attributes for graphIn
+    :type xIn: list
+
     :param model: generative network model
-    :return:
-        :phi: list of tuples with edge types
-                (e.g., (0,0), (0,1), (1,1))
-        :beta: dictionary with fraction of edges of each type
-        :thetaX: parameters for marginal distribution of node attributes P(X);
-                   Ex. MLE for Bernoulli trials
-        :thetaG: parameters for marginal distribution of network structure P(G);
-                   Ex. mKPGM parameters
+
+    :param distribution: "binomial" or "multinomial"
+    :type distribution: String
+
+    :return: phi (edge types), beta (fraction of edge types),
+    thetaX (parameters for P(X)), thetaG (parameters for P(G))
+    :rtype: list of tuples, dictionary, dictionary, matrix
     """
     # TODO: (1) learn parameters (phi, beta, thetaX, thetaG)
     phi = None
     beta = None
-    thetaX = f_x(xIn)
+    thetaX = f_x(xIn, distribution)
     thetaG = [[0.7, 0.4], [0.4, 0.5]]
 
     return phi, beta, thetaX, thetaG
+
+
+def f_x(xIn, distribution):
+    """
+    function to learn thetaX parameters for P(X)
+
+    :param xIn: attributes for vertices of graphIn
+    :type xIn: list
+
+    :param distribution: "binomial" or "multinomial:
+    :type distribution: String
+
+    :return:
+    """
+    # TODO: (1) learn parameters thetaX
+
+    if distribution in ["binomial", "multinomial"]:
+        labels = list(set(xIn))
+        thetaX = {}
+
+        for l in labels:
+            thetaX[l] = float(xIn.count(l)) / len(xIn)
+
+        # if distribution == "binomial":
+        #     for l in labels:
+        #         thetaX[l] = float(xIn.count(l)/len(xIn))
+        # elif distribution == "multinomial":
+        #     pass
+
+        # return {"low": 2, "size": xIn}
+        return thetaX
+    else:
+        raise ValueError("Supported distributions are 'binomial' and 'multinomial'")
+
+
+def sample_x(thetaX, distribution, num_samples):
+    """
+    Sample node attributes xOut from P(X|thetaX)
+
+    :param thetaX: parameters for P(X)
+    :type thetaX: dictionary
+
+    :param distribution: "binomial" or "multinomial:
+    :type distribution: String
+
+    :param num_samples: number of samples
+    :type num_samples: int
+
+    :return: xOut (new attributes for graphOut)
+    :rtype: list
+    """
+
+    if distribution in ["binomial", "multinomial"]:
+        labels = thetaX.keys()
+        probabilities = [thetaX[l] for l in labels]
+
+        tmp = np.random.multinomial(n=(len(labels) - 1), pvals=probabilities, size=num_samples)
+        xOut = [t[0] for t in tmp]
+
+        return xOut
+    else:
+        raise ValueError("Supported distributions are 'binomial' and 'multinomial'")
 
 
 def ME_edge_sampling(model, thetaG, phi, beta):
