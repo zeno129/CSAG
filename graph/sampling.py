@@ -1,10 +1,11 @@
 import random
 import numpy as np
+import itertools
 from scipy.stats.stats import pearsonr
-from kronecker import mKPGM as model
+from kronecker import mKPGM as mKPGM
 
 
-def graph_sampling(graphIn, xIn, model, epsilon, distribution):
+def graph_sampling(graphIn, xIn, model, epsilon, distribution, thetaG=None):
     """
     Graph Sampling algorithm
 
@@ -14,8 +15,8 @@ def graph_sampling(graphIn, xIn, model, epsilon, distribution):
     :param xIn: node attributes for graphIn
     :type xIn: list
 
-    :param model: generative network model (KPGM or mKPGM)
-    :type model: string
+    :param model: GNM and parameters
+    :type model: dict
 
     :param epsilon: error
     :type epsilon: float
@@ -31,35 +32,62 @@ def graph_sampling(graphIn, xIn, model, epsilon, distribution):
 
     # model = ??? -- is this just b and l? ...since theta and K can be learned
 
-    # (1) learn parameters
-    psi, beta, thetaX, thetaG = learn_parameters(graphIn, xIn, model, distribution)
+    # TODO (1) learn parameters
+    if thetaG:
+        thetaX = f_x(xIn, distribution)
+        # psi = list(itertools.combinations_with_replacement(thetaX.keys(), 2))
+        psi = [(0,0), (0,1), (1,0), (1,1)]
+        # psi = list(itertools.product(thetaX.keys(), repeat=2))
+        # beta = [0.25, 0.25, 0.25, 0.25]
+        # beta = [0.4375, 0.125, 0.125, 0.4375]
+        # beta = [0.45, 0.05, 0.05, 0.45]
+        # beta = [0.48, 0.01, 0.01, 0.48]
+        # beta = [0.97, 0.01, 0.01, 0.01]
+        beta = [0.05, 0.45, 0.45, 0.05]
+    else:
+        psi, beta, thetaX, thetaG = learn_parameters(graphIn, xIn, model, distribution)
+
+    n = pow(model['b'], model['K'])
 
     # (2) sample node attributes xOut from P(X|thetaX)
     # TODO: change to number of vertices in graphOut
-    xOut = sample_x(thetaX, distribution, len(verticesIn))
+    # xOut = sample_x(thetaX, distribution, len(verticesIn))
+    xOut = sample_x(thetaX, distribution, n)
 
     # thetaG = [[0.7, 0.4], [0.4, 0.5]]
     # graphOut = model.mKPGM(thetaG, K=5, b=2, l=2)
 
-    # TODO: (3) init rhoOut = (correlation) and l_o = K - l - 1
+    # (3) init rhoOut = (correlation) and l_o = K - l - 1
+    rhoOut = np.inf
+    if model['name'] == "mKPGM":
+        l_o = model['K'] - model['l'] - 1
+    else:
+        # TODO: implement for KPGM
+        raise NotImplemented
     # K can be learned
     # l has to be specified
     # rho_OUT = np.inf
     # l_o = K - l - 1
     # TODO: (4) while loop --
     # TODO: (5-8) block sampling with ME and LP
-    verticesOut, edgesOut = maxent_edge_sampling(model, thetaG, block, psi, beta, xOut)
+
+    # (5) sample last block
+    # TODO: implement for KPGM
+    # g = mKPGM.mKPGM(thetaG, model['K'], model['b'], model['l'])
+    graphOut = mKPGM.mKPGM(thetaG, model['K'], len(thetaG[0]), model['l'])
+    # (8) sample edges
+    verticesOut, edgesOut = maxent_edge_sampling(model, thetaG, graphOut.blocks[-1], psi, beta, xOut)
 
     # TODO: (9) calculate rhoOut
     # Initial version
     # TODO: use graphOut.edges
-    # rhoOut = calc_correlation(graphOut.edges, xOut)
-    rhoOut = calc_correlation(edgesIn, xOut)
+    rhoOut = calc_correlation(graphOut.edges, xOut)
+    # rhoOut = calc_correlation(edgesIn, xOut)
 
     # TODO: (10) update l_o
 
-    # return graphOut, xOut
-    return graphIn, xOut
+    return graphOut, xOut
+    # return graphIn, xOut
 
 
 def learn_parameters(graphIn, xIn, model, distribution):
@@ -71,8 +99,8 @@ def learn_parameters(graphIn, xIn, model, distribution):
     :param xIn: node attributes for graphIn
     :type xIn: list
 
-    :param model: generative network model (KPGM or mKPGM)
-    :type model: string
+    :param model: GNM and parameters
+    :type model: dict
 
     :param distribution: "binomial" or "multinomial"
     :type distribution: String
@@ -82,6 +110,7 @@ def learn_parameters(graphIn, xIn, model, distribution):
     :rtype: list of tuples, dictionary, dictionary, matrix
     """
     # TODO: (1) learn parameters (psi, beta, thetaX, thetaG)
+    # TODO: do I need model in here??
     psi = None
     beta = None
     thetaX = f_x(xIn, distribution)
@@ -102,7 +131,7 @@ def f_x(xIn, distribution):
 
     :return:
     """
-    # TODO: (1) learn parameters thetaX
+    # (1) learn parameters thetaX
 
     if distribution in ["binomial", "multinomial"]:
         labels = list(set(xIn))
@@ -111,13 +140,6 @@ def f_x(xIn, distribution):
         for l in labels:
             thetaX[l] = float(xIn.count(l)) / len(xIn)
 
-        # if distribution == "binomial":
-        #     for l in labels:
-        #         thetaX[l] = float(xIn.count(l)/len(xIn))
-        # elif distribution == "multinomial":
-        #     pass
-
-        # return {"low": 2, "size": xIn}
         return thetaX
     else:
         raise ValueError("Supported distributions are 'binomial' and 'multinomial'")
@@ -156,8 +178,8 @@ def sample_x(thetaX, distribution, num_samples):
 def maxent_edge_sampling(model, thetaG, block, psi, beta, xOut):
     """
 
-    :param model: generative network model (KPGM or mKPGM)
-    :type model: string
+    :param model: GNM and parameters
+    :type model: dict
 
     :param thetaG: parameters for marginal distribution of network structure P(G)
     :type thetaG: matrix
@@ -177,7 +199,7 @@ def maxent_edge_sampling(model, thetaG, block, psi, beta, xOut):
     :return: graphOut (output graph, contains num. of vertices and edge list)
     :rtype: tuple
     """
-    U,T = get_unique_prob_edge_location(model, thetaG, block, psi, xOut)
+    U, T = get_unique_prob_edge_location(model, thetaG, block, psi, xOut)
     # N_e = 0
     Nus = []
 
@@ -199,7 +221,7 @@ def maxent_edge_sampling(model, thetaG, block, psi, beta, xOut):
     E_OUT = []
     for i, u in enumerate(U):
         # Draw num. edges per edge type for pi_u
-        Y = list(np.random.multinomial(n=Nus[i], pvals=[float(g)/N_e for g in gamma[0]], size=1))
+        Y = list(np.random.multinomial(n=Nus[i], pvals=[np.double(g)/N_e for g in gamma[0]], size=1))
         for j, p in enumerate(psi):
             possible_edges = list(T[u][p])
             random.shuffle(possible_edges)
@@ -209,7 +231,8 @@ def maxent_edge_sampling(model, thetaG, block, psi, beta, xOut):
             gamma[0][j] -= Y[0][j]
             N_e -= Y[0][j]
 
-    vertices = len(block[0])
+    # vertices = len(block[0])
+    vertices = pow(model['b'], model['K'])
 
     return vertices, E_OUT
 
@@ -217,14 +240,14 @@ def maxent_edge_sampling(model, thetaG, block, psi, beta, xOut):
 def get_unique_prob_edge_location(model, thetaG, block, psi, xOut):
     """
 
-    :param model: generative network model (KPGM or mKPGM)
-    :type model: string
+    :param model: GNM and parameters
+    :type model: dict
 
     :param thetaG: parameters for marginal distribution of network structure P(G)
     :type thetaG: matrix
 
     :param block: sample block from penultimate iteration of mKPGM
-    :type block: matrix
+    :type block: dict
 
     :param psi: edge types
     :type psi: list
@@ -236,41 +259,58 @@ def get_unique_prob_edge_location(model, thetaG, block, psi, xOut):
     :rtype: set, matrix
     """
 
-    if model == "mKPGM":
+    if model['name'] == "mKPGM":
         # Calc U (set unique probabilities), use node attributes
         # For mKPGM it's just the theta[i][j] values
         # U = thetaG.flatten()
-        U = thetaG
+        U = [i for row in thetaG for i in row]
 
         # Index T by probability (pi_u) and edge-type (psi)
         T = dict.fromkeys(U, dict.fromkeys(psi, list()))
-        # get indices for edges (non-zero probability)
-        for idx1, row in enumerate(block):
-            for idx2, prob in enumerate(row):
-                if prob != 0:
-                    edge_type = (xOut[idx1], xOut[idx2])
-                    edge_loc = (idx1, idx2)
-                    T[prob][edge_type].append(edge_loc)
 
-        return (U,T)
+        # get indices for edges (non-zero probability)
+        for prob in block.keys():
+            for i,j in block[prob]:
+                edge_type = (xOut[i], xOut[j])
+                edge_loc = (i, j)
+                T[prob][edge_type].append(edge_loc)
+
+        return U, T
     else:
         # TODO: calc U and T for KPGM
-        raise NotImplementedError
+        raise NotImplemented
 
 
-def lp_block_search(model, thetaG, blockSample_l, psi, beta):
+def lp_block_search(model, thetaG, blockSample_l, psi, beta, xOut):
     """
 
-    :param model: generative network model
+    :param model: GNM and parameters
+    :type model: dict
+
     :param thetaG: parameters for marginal distribution of network structure P(G)
-    :param blockSample_l: matrix with block probabilities?
-    :param psi: list of tuples with edge types
-    :param beta: dictionary with fraction of edges of each type
+    :type thetaG: matrix
+
+    :param blockSample_l: sample block from l-th iteration of mKPGM
+    :type block: matrix
+
+    :param psi: edge types
+    :type psi: list
+
+    :param beta: fraction of edges of each type
+    :type beta: list
+
+    :param xOut: node attributes
+    :type xOut: list
+
     :return:
-        :blockSample_lPlus1: sampled blocks in l+1
+        :blockSample_lPlus1: sampled block in l+1
     """
     # TODO: LPBlockSearch
-    pass
+    raise NotImplemented
+
+
+def get_unique_prob_block_location(model, thetaG, block_l):
+    raise NotImplemented
 
 
 def calc_correlation(edges, labels):
