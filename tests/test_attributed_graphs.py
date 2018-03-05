@@ -1,93 +1,218 @@
 # import itertools
 # import operator
+import random
 import numpy as np
 from kronecker import mKPGM as model
 from graph import sampling
+from scipy.stats.stats import pearsonr
 
 
-def test_graph_sampling_binomial():
+# def test_graph_sampling_binomial():
+#     """
+#     Test dumb version:
+#     Create graph and get random attributes back.
+#     Use binomial distribution.
+#     """
+#     b = 2
+#     k = 5
+#     l = 2
+#     theta = [[0.7, 0.4], [0.4, 0.5]]
+#     g = model.mKPGM(theta, k, b, l)
+#     mymodel = {'name': "KPGM", 'k': k, 'b': b, 'l': l}
+#
+#     x = list(np.random.random_integers(low=0, high=1, size=g.vertices))
+#
+#     _, attributes = sampling.graph_sampling(graphIn=(range(g.vertices), g.edges),
+#                                             xIn=x,
+#                                             model=mymodel,
+#                                             epsilon=0.0,
+#                                             distribution="binomial")
+#
+#     # TODO: calculate with graphOut
+#     n = g.vertices
+#     p = 0.5
+#     mean = n * p
+#     variance = mean * (1 - p)
+#
+#     assert len(attributes) == g.vertices
+#     assert attributes.count(1) <= mean + variance
+#     assert attributes.count(1) >= mean - variance
+#
+#
+# def test_graph_sampling_multinomial():
+#     """
+#     Test dumb version:
+#     Create graph and get random attributes back.
+#     Use binomial distribution.
+#     """
+#     b = 2
+#     k = 5
+#     l = 2
+#     theta = [[0.7, 0.4], [0.4, 0.5]]
+#     g = model.mKPGM(theta, k, b, l)
+#     mymodel = {'name': "KPGM", 'k': k, 'b': b, 'l': l}
+#
+#     x = list(np.random.random_integers(low=0, high=3, size=g.vertices))
+#
+#     _, attributes = sampling.graph_sampling(graphIn=(range(g.vertices), g.edges),
+#                                             xIn=x,
+#                                             model=mymodel,
+#                                             epsilon=0.0,
+#                                             distribution="multinomial")
+#
+#     # TODO: calculate with graphOut
+#     n = g.vertices
+#     p = 0.25
+#     mean = n * p
+#     variance = mean * (1 - p)
+#
+#     assert len(attributes) == g.vertices
+#     assert attributes.count(1) <= mean + variance
+#     assert attributes.count(1) >= mean - variance
+
+
+# def test_maxent_edge_sampling():
+#     # model = "mKPGM"
+#     mymodel = {'name': "KPGM", 'k': None, 'b': None, 'l': None}
+#     theta = [0.7, 0.4, 0.4, 0.5]
+#     num_nodes = 2 ** 4
+#
+#     # TODO: get real block from mKPGM model
+#     block = [ np.random.choice(theta, num_nodes) for i in range(num_nodes)]
+#     psi = [(0,0), (0,1), (1,0), (1,1)]
+#     p = 0.25
+#     probs = [p,p,p,p]
+#     tmp = np.random.multinomial(n=1, pvals=probs, size=num_nodes)
+#     xOut = [t[0] for t in tmp]
+#
+#     vertices, edges = sampling.maxent_edge_sampling(mymodel,theta,block,psi,probs,xOut)
+#     edge_labels = [(xOut[u], xOut[v]) for u,v in edges]
+#
+#     # TODO: test for all probabilities
+#     n = vertices
+#     mean = n * p
+#     variance = mean * (1 - p)
+#
+#     assert vertices == num_nodes
+#     assert edge_labels.count(psi[0]) <= mean + variance
+#     assert edge_labels.count(psi[0]) >= mean - variance
+
+
+def test_graph_sampling_binomial_no_learning():
     """
     Test dumb version:
     Create graph and get random attributes back.
     Use binomial distribution.
     """
     b = 2
-    k = 5
+    # k = 5
+    k = 10
     l = 2
     theta = [[0.7, 0.4], [0.4, 0.5]]
-    g = model.mKPGM(theta, k, b, l)
+    n = pow(b, k)
 
-    x = list(np.random.random_integers(low=0, high=1, size=g.vertices))
+    # g = model.mKPGM(theta, k, b, l)
+    mymodel = {'name': "mKPGM", 'K': k, 'b': b, 'l': l, 'theta': theta}
 
-    _, attributes = sampling.graph_sampling(graphIn=(range(g.vertices), g.edges),
+    # x = list(np.random.random_integers(low=0, high=1, size=n))
+
+    x = [0] * (n / 2)
+    x.extend([1] * (n / 2))
+    random.shuffle(x)
+
+    graphOut, xOut = sampling.graph_sampling(graphIn=(None, None),
                                             xIn=x,
-                                            model="mKPGM",
+                                            model=mymodel,
                                             epsilon=0.0,
-                                            distribution="binomial")
+                                            distribution="binomial",
+                                            thetaG=theta)
 
     # TODO: calculate with graphOut
-    n = g.vertices
     p = 0.5
     mean = n * p
     variance = mean * (1 - p)
 
-    assert len(attributes) == g.vertices
-    assert attributes.count(1) <= mean + variance
-    assert attributes.count(1) >= mean - variance
+    # TODO: figure out how to test correlation
+    assert len(xOut) == n
+
+    with open("correlations.txt", "a") as myfile:
+        corr = calc_correlation(graphOut.edges, xOut)
+        myfile.write("theta = {}\t\tcorrelation = {}\n\n".format(theta, corr))
+
+    # assert calc_correlation(graphOut[1], xOut) == 0.5
+    assert xOut.count(1) <= mean + variance
+    assert xOut.count(1) >= mean - variance
 
 
-def test_graph_sampling_multinomial():
-    """
-    Test dumb version:
-    Create graph and get random attributes back.
-    Use binomial distribution.
-    """
+def test_multiple_random_graphs():
     b = 2
-    k = 5
+    # k = 5
+    k = 10
     l = 2
-    theta = [[0.7, 0.4], [0.4, 0.5]]
-    g = model.mKPGM(theta, k, b, l)
+    n = pow(b, k)
 
-    x = list(np.random.random_integers(low=0, high=3, size=g.vertices))
+    probs = [0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3]  # v2
+    # probs = [0.7, 0.5, 0.3]  # v2
+    # probs = [0.5, 0.4, 0.3]  # v3
+    for p in probs:
+        theta = [[p, p], [p, p]]
 
-    _, attributes = sampling.graph_sampling(graphIn=(range(g.vertices), g.edges),
-                                            xIn=x,
-                                            model="mKPGM",
-                                            epsilon=0.0,
-                                            distribution="multinomial")
+        mymodel = {'name': "mKPGM", 'K': k, 'b': b, 'l': l, 'theta': theta}
 
-    # TODO: calculate with graphOut
-    n = g.vertices
-    p = 0.25
-    mean = n * p
-    variance = mean * (1 - p)
+        # x = list(np.random.random_integers(low=0, high=1, size=n))
+        x = [0] * (n/2)
+        x.extend([1] * (n/2))
+        random.shuffle(x)
 
-    assert len(attributes) == g.vertices
-    assert attributes.count(1) <= mean + variance
-    assert attributes.count(1) >= mean - variance
+        graphOut, xOut = sampling.graph_sampling(graphIn=(None, None),
+                                                 xIn=x,
+                                                 model=mymodel,
+                                                 epsilon=0.0,
+                                                 distribution="binomial",
+                                                 thetaG=theta)
+
+        x_prob = 0.5
+        mean = n * x_prob
+        variance = n * x_prob * (1 - x_prob)
+
+        # TODO: figure out how to test correlation
+        assert len(xOut) == n
+        # assert calc_correlation(graphOut[1], xOut) == 0.5
+
+        with open("correlations.txt", "a") as myfile:
+            corr = calc_correlation(graphOut.edges, xOut)
+            myfile.write("theta = {}\t\tcorrelation = {}\n\n".format(theta, corr))
+
+        assert xOut.count(1) <= mean + variance
+        assert xOut.count(1) >= mean - variance
 
 
-def test_maxent_edge_sampling():
-    model = "mKPGM"
-    theta = [0.7, 0.4, 0.4, 0.5]
-    num_nodes = 2 ** 4
+# def test_range_of_graphs():
+#     b = 2
+#     # k = 5
+#     k = 10
+#     l = 2
+#     n = pow(b, k)
+#
+#     theta_11 = [0.99, 0.95, 0.9, 0.85, 0.8]
+#     theta_12 = [0.55, 0.45, 0.35, 0.25, 0.15]
+#     theta_22 = [0.75, 0.65, 0.55, 0.45, 0.35]
+#     # % theta_22 = [0.75 0.7 0.65 0.6 0.55];
 
-    # TODO: get real block from mKPGM model
-    block = [ np.random.choice(theta, num_nodes) for i in range(num_nodes)]
-    psi = [(0,0), (0,1), (1,0), (1,1)]
-    p = 0.25
-    probs = [p,p,p,p]
-    tmp = np.random.multinomial(n=1, pvals=probs, size=num_nodes)
-    xOut = [t[0] for t in tmp]
 
-    vertices, edges = sampling.maxent_edge_sampling(model,theta,block,psi,probs,xOut)
-    edge_labels = [(xOut[u], xOut[v]) for u,v in edges]
+def calc_correlation(edges, labels):
+    '''
+    Calculate the Pearson correlation across edges.
 
-    # TODO: test for all probabilities
-    n = vertices
-    mean = n * p
-    variance = mean * (1 - p)
+    :param edges: list of tuples containing node indices
+    :param labels:
+    :return:
+    '''
+    x = []
+    y = []
 
-    assert vertices == num_nodes
-    assert edge_labels.count(psi[0]) <= mean + variance
-    assert edge_labels.count(psi[0]) >= mean - variance
+    for (u,v) in edges:
+        x.append(labels[u])
+        y.append(labels[v])
+
+    return float(pearsonr(x,y)[0])
