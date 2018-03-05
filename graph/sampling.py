@@ -310,7 +310,28 @@ def lp_block_search(model, thetaG, blockSample_l, psi, beta, xOut):
 
 
 def get_unique_prob_block_location(model, thetaG, block_l):
-    raise NotImplemented
+    if model['name'] == "mKPGM":
+        # Calc U (set unique probabilities), use node attributes
+        # For mKPGM it's just the theta[i][j] values
+        # U = thetaG.flatten()
+        U = [i for row in thetaG for i in row]
+
+        # Index T by probability (pi_u) and edge-type (psi)
+        # T = dict.fromkeys(U, dict.fromkeys(psi, list()))
+        T = dict.fromkeys(U, list())
+
+        # get indices for edges (non-zero probability)
+        for prob in block_l.keys():
+            for i,j in block_l[prob]:
+                # edge_type = (xOut[i], xOut[j])
+                block_loc = (i, j)
+                # T[prob][edge_type].append(edge_loc)
+                T[prob].append(block_loc)
+
+        return U, T
+    else:
+        # TODO: calc U and T for KPGM
+        raise NotImplemented
 
 
 def calc_correlation(edges, labels):
