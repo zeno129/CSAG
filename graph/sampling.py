@@ -5,7 +5,7 @@ from scipy.stats.stats import pearsonr
 from kronecker import mKPGM as mKPGM
 
 
-def graph_sampling(graphIn, xIn, model, epsilon, distribution, thetaG=None):
+def graph_sampling(graphIn, xIn, model, epsilon, distribution, params_test=None):
     """
     Graph Sampling algorithm
 
@@ -31,19 +31,21 @@ def graph_sampling(graphIn, xIn, model, epsilon, distribution, thetaG=None):
     verticesIn, edgesIn = graphIn
 
     # model = ??? -- is this just b and l? ...since theta and K can be learned
-
+    # thetaG=None, beta=None
     # TODO (1) learn parameters
-    if thetaG:
+
+    # TODO: testing code
+    psi = [(0, 0), (0, 1), (1, 0), (1, 1)]
+    # psi = list(itertools.product(thetaX.keys(), repeat=2))
+
+    if params_test:
+        # if "beta" in params_test.keys():
+        beta = params_test["beta"]
+
+        # if "thetaG" in params_test.keys():
+        thetaG = params_test["thetaG"]
         thetaX = f_x(xIn, distribution)
-        # psi = list(itertools.combinations_with_replacement(thetaX.keys(), 2))
-        psi = [(0,0), (0,1), (1,0), (1,1)]
-        # psi = list(itertools.product(thetaX.keys(), repeat=2))
-        # beta = [0.25, 0.25, 0.25, 0.25]
-        # beta = [0.4375, 0.125, 0.125, 0.4375]
-        # beta = [0.45, 0.05, 0.05, 0.45]
-        # beta = [0.48, 0.01, 0.01, 0.48]
-        # beta = [0.97, 0.01, 0.01, 0.01]
-        beta = [0.05, 0.45, 0.45, 0.05]
+
     else:
         psi, beta, thetaX, thetaG = learn_parameters(graphIn, xIn, model, distribution)
 
@@ -52,7 +54,8 @@ def graph_sampling(graphIn, xIn, model, epsilon, distribution, thetaG=None):
     # (2) sample node attributes xOut from P(X|thetaX)
     # TODO: change to number of vertices in graphOut
     # xOut = sample_x(thetaX, distribution, len(verticesIn))
-    xOut = sample_x(thetaX, distribution, n)
+    # xOut = sample_x(thetaX, distribution, n)
+    xOut = xIn
 
     # thetaG = [[0.7, 0.4], [0.4, 0.5]]
     # graphOut = model.mKPGM(thetaG, K=5, b=2, l=2)
@@ -76,7 +79,15 @@ def graph_sampling(graphIn, xIn, model, epsilon, distribution, thetaG=None):
     # g = mKPGM.mKPGM(thetaG, model['K'], model['b'], model['l'])
     graphOut = mKPGM.mKPGM(thetaG, model['K'], len(thetaG[0]), model['l'])
     # (8) sample edges
-    verticesOut, edgesOut = maxent_edge_sampling(model, thetaG, graphOut.blocks[-1], psi, beta, xOut)
+
+    # TODO: testing version
+    if params_test and "last_block" in params_test:
+        verticesOut, edgesOut = maxent_edge_sampling(model, thetaG, params_test["last_block"], psi, beta, xOut)
+    else:
+        verticesOut, edgesOut = maxent_edge_sampling(model, thetaG, graphOut.blocks[-1], psi, beta, xOut)
+
+    # verticesOut, edgesOut = maxent_edge_sampling(model, thetaG, graphOut.blocks[-1], psi, beta, xOut)
+    graphOut.edges = edgesOut
 
     # TODO: (9) calculate rhoOut
     # Initial version
@@ -199,6 +210,8 @@ def maxent_edge_sampling(model, thetaG, block, psi, beta, xOut):
     :return: graphOut (output graph, contains num. of vertices and edge list)
     :rtype: tuple
     """
+    # U = unique probabilities
+    # T = edge locations
     U, T = get_unique_prob_edge_location(model, thetaG, block, psi, xOut)
     # N_e = 0
     Nus = []
@@ -269,7 +282,7 @@ def get_unique_prob_edge_location(model, thetaG, block, psi, xOut):
         T = dict.fromkeys(U, dict.fromkeys(psi, list()))
 
         # get indices for edges (non-zero probability)
-        for prob in block.keys():
+        for prob in block.keys():  # these correspond to theta values for mKPGM
             for i,j in block[prob]:
                 edge_type = (xOut[i], xOut[j])
                 edge_loc = (i, j)
@@ -306,7 +319,20 @@ def lp_block_search(model, thetaG, blockSample_l, psi, beta, xOut):
         :blockSample_lPlus1: sampled block in l+1
     """
     # TODO: LPBlockSearch
-    raise NotImplemented
+    U, T = get_unique_prob_block_location(model, thetaG, blockSample_l)
+
+    # for each unique prob. pi_u
+    for u, pi_u in enumerate(U):
+        # Draw num. edges per unique prob.
+        n_u = np.random.binomial(len(T[pi_u]), pi_u)
+
+        for j, psi_j in enumerate(psi):
+            # fraction of possible edges leading to rho_IN
+            e_j = beta[j] * n_u
+
+        # Determing A_jk --
+        # Num. descendant edges of type psi_j in psi
+        # per position t_k in T_u
 
 
 def get_unique_prob_block_location(model, thetaG, block_l):
