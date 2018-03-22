@@ -49,13 +49,19 @@ def graph_sampling(graphIn, xIn, model, epsilon, distribution, params_test=None)
     else:
         psi, beta, thetaX, thetaG = learn_parameters(graphIn, xIn, model, distribution)
 
-    n = pow(model['b'], model['K'])
+    if not params_test:
+        psi, beta, thetaX, thetaG = learn_parameters(graphIn, xIn, model, distribution)
+        n = pow(model['b'], model['K'])
+        # (2) sample node attributes xOut from P(X|thetaX)
+        xOut = sample_x(thetaX, distribution, n)
+    else:
+        # if "beta" in params_test.keys():
+        beta = params_test["beta"]
 
-    # (2) sample node attributes xOut from P(X|thetaX)
-    # TODO: change to number of vertices in graphOut
-    # xOut = sample_x(thetaX, distribution, len(verticesIn))
-    # xOut = sample_x(thetaX, distribution, n)
-    xOut = xIn
+        # if "thetaG" in params_test.keys():
+        thetaG = params_test["thetaG"]
+        thetaX = f_x(xIn, distribution)
+        xOut = xIn
 
     # thetaG = [[0.7, 0.4], [0.4, 0.5]]
     # graphOut = model.mKPGM(thetaG, K=5, b=2, l=2)
