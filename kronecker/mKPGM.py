@@ -58,20 +58,24 @@ class mKPGM:
                     # (13) loop replaced by GGPS line 7
                     while countEdge <= T_ij:
                         # (12) Random permutation
-                        sigma = range(K)
-                        random.shuffle(sigma)
+                        # sigma = range(K)
+                        # random.shuffle(sigma)
 
                         # (14) Generate new edge (u,v); GGPS line 8
-                        # i.e., pick a random edge from G_{l+k-1} and calculate new indices
+                        # pick a random edge from G_{l+k-1}
+                        # (u, v) = random.sample(Lambda_ij, 1)[0]
                         (u, v) = random.sample(self.edges, 1)[0]
+
+                        # Blocks: store u,v with k
+                        # self.blocks[k]['edges'].append((u, v))
+                        self.blocks[k - l][theta_ij].append((u, v))
+
+                        # calculate new indices
                         u = u * b + i
                         v = v * b + j
 
                         # (15) Add edge to list; GGPS line 9
                         E_k.append((u,v))
-                        # Blocks: store u,v with k
-                        # self.blocks[k]['edges'].append((u, v))
-                        self.blocks[k-l][theta_ij].append((u,v))
 
                         # GGPS line 10
                         countEdge += 1 + floor(np.log(1 - np.random.uniform(0, 1)) / np.log(1 - theta_ij))
