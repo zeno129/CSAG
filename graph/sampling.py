@@ -292,15 +292,13 @@ def get_unique_prob_edge_location(model, thetaG, block, psi, xOut):
 
         # get indices for edges (non-zero probability)
         for prob in block.keys():  # these correspond to theta values for mKPGM
-            # TODO: map i,j from block[l] to u,v in E_OUT
             for s,t in block[prob]:
-
+                # map i,j from block[l] to u,v in E_OUT
                 for i in range(b):
                     for j in range(b):
                         u = s * b + i
                         v = t * b + j
 
-                        # TODO FIX -- for some reason getting vertex indices instead of block indices
                         edge_type = (xOut[u], xOut[v])
                         edge_loc = (u, v)
                         T[prob][edge_type].append(edge_loc)
@@ -359,17 +357,24 @@ def get_unique_prob_block_location(model, thetaG, block_l):
         # U = thetaG.flatten()
         U = [i for row in thetaG for i in row]
 
-        # Index T by probability (pi_u) and edge-type (psi)
+        # Index T by probability (pi_u)
         # T = dict.fromkeys(U, dict.fromkeys(psi, list()))
         T = dict.fromkeys(U, list())
 
+        b = model['b']
+
         # get indices for edges (non-zero probability)
-        for prob in block_l.keys():
-            for i,j in block_l[prob]:
-                # edge_type = (xOut[i], xOut[j])
-                block_loc = (i, j)
-                # T[prob][edge_type].append(edge_loc)
-                T[prob].append(block_loc)
+        for prob in block_l.keys():    # these correspond to theta values for mKPGM
+            for s,t in block_l[prob]:
+                # map i,j from block[l] to u,v in E_OUT
+                for i in range(b):
+                    for j in range(b):
+                        u = s * b + i
+                        v = t * b + j
+                        # edge_type = (xOut[i], xOut[j])
+                        block_loc = (u, v)
+                        # T[prob][edge_type].append(edge_loc)
+                        T[prob].append(block_loc)
 
         return U, T
     else:
