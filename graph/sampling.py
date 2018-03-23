@@ -61,6 +61,7 @@ def graph_sampling(graphIn, xIn, model, epsilon, distribution, params_test=None)
         # if "thetaG" in params_test.keys():
         thetaG = params_test["thetaG"]
         thetaX = f_x(xIn, distribution)
+        # TODO: add param to hardcode or sample
         xOut = xIn
 
     # thetaG = [[0.7, 0.4], [0.4, 0.5]]
@@ -87,7 +88,7 @@ def graph_sampling(graphIn, xIn, model, epsilon, distribution, params_test=None)
     # (8) sample edges
 
     # TODO: testing version
-    if params_test and "last_block" in params_test:
+    if params_test and "last_block" in params_test and params_test["last_block"]:
         verticesOut, edgesOut = maxent_edge_sampling(model, thetaG, params_test["last_block"], psi, beta, xOut)
     else:
         verticesOut, edgesOut = maxent_edge_sampling(model, thetaG, graphOut.blocks[-1], psi, beta, xOut)
@@ -287,12 +288,22 @@ def get_unique_prob_edge_location(model, thetaG, block, psi, xOut):
         # Index T by probability (pi_u) and edge-type (psi)
         T = dict.fromkeys(U, dict.fromkeys(psi, list()))
 
+        b = model['b']
+
         # get indices for edges (non-zero probability)
         for prob in block.keys():  # these correspond to theta values for mKPGM
-            for i,j in block[prob]:
-                edge_type = (xOut[i], xOut[j])
-                edge_loc = (i, j)
-                T[prob][edge_type].append(edge_loc)
+            # TODO: map i,j from block[l] to u,v in E_OUT
+            for s,t in block[prob]:
+
+                for i in range(b):
+                    for j in range(b):
+                        u = s * b + i
+                        v = t * b + j
+
+                        # TODO FIX -- for some reason getting vertex indices instead of block indices
+                        edge_type = (xOut[u], xOut[v])
+                        edge_loc = (u, v)
+                        T[prob][edge_type].append(edge_loc)
 
         return U, T
     else:
