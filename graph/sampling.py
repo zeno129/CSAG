@@ -2,6 +2,7 @@ import random
 import numpy as np
 import itertools
 from scipy.stats.stats import pearsonr
+from scipy.optimize import linprog
 from kronecker import mKPGM as mKPGM
 
 
@@ -193,7 +194,7 @@ def sample_x(thetaX, distribution, num_samples):
         raise ValueError("Supported distributions are 'binomial' and 'multinomial'")
 
 
-def maxent_edge_sampling(model, thetaG, block, psi, beta, xOut):
+def maxent_edge_sampling(model, thetaG, block, l, psi, beta, xOut):
     """
 
     :param model: GNM and parameters
@@ -219,20 +220,21 @@ def maxent_edge_sampling(model, thetaG, block, psi, beta, xOut):
     """
     # U = unique probabilities
     # T = edge locations
+    # (3)
     U, T = get_unique_prob_edge_location(model, thetaG, block, psi, xOut)
     # N_e = 0
     Nus = []
 
     # for each unique prob. pi_u
     for pi_u in U:
-        # Draw num. edges per unique prob.
+        # (5) Draw num. edges to sample per unique prob.
         n_u = np.random.binomial(len(T[pi_u]), pi_u)
-        Nus.append(n_u)
+        Nus.append(n_u)  # (6)
         # Accum. total num. edges to be sampled
         # N_e += n_u
     N_e = sum(Nus)
 
-    # Draw num. edges per edge-type to match rho_IN
+    # (7) Draw num. edges per edge-type to match rho_IN
     gamma = list(np.random.multinomial(n=N_e, pvals=beta, size=1))
     # n = Number of experiments (int)
     # pvals = Probabilities of each of the p different outcomes (sequence of floats, length p)
@@ -240,16 +242,19 @@ def maxent_edge_sampling(model, thetaG, block, psi, beta, xOut):
 
     E_OUT = []
     for i, u in enumerate(U):
-        # Draw num. edges per edge type for pi_u
+        # (9) Draw num. edges per edge type for pi_u
         Y = list(np.random.multinomial(n=Nus[i], pvals=[np.double(g)/N_e for g in gamma[0]], size=1))
+
+        # (10 - 14)
         for j, p in enumerate(psi):
+            # (11) Sampling Y_j edges at random from T_uj possible locations
             possible_edges = list(T[u][p])
             random.shuffle(possible_edges)
             edges = possible_edges[:Y[0][j]]
 
-            E_OUT.extend(edges)
-            gamma[0][j] -= Y[0][j]
-            N_e -= Y[0][j]
+            E_OUT.extend(edges)  # (12)
+            gamma[0][j] -= Y[0][j]  # (13)
+            N_e -= Y[0][j]  # (14)
 
     # vertices = len(block[0])
     vertices = pow(model['b'], model['K'])
@@ -309,7 +314,7 @@ def get_unique_prob_edge_location(model, thetaG, block, psi, xOut):
         raise NotImplemented
 
 
-def lp_block_search(model, thetaG, blockSample_l, psi, beta, xOut):
+def lp_block_search(model, thetaG, blockSample_l, l, psi, beta, xOut):
     """
 
     :param model: GNM and parameters
@@ -333,24 +338,63 @@ def lp_block_search(model, thetaG, blockSample_l, psi, beta, xOut):
     :return:
         :blockSample_lPlus1: sampled block in l+1
     """
-    # TODO: LPBlockSearch
-    U, T = get_unique_prob_block_location(model, thetaG, blockSample_l)
+
+    # (3)
+    U, T = get_unique_prob_block_location(model, thetaG, blockSample_l, l, psi, xOut)
 
     # for each unique prob. pi_u
+    # (4)
     for u, pi_u in enumerate(U):
-        # Draw num. edges per unique prob.
-        n_u = np.random.binomial(len(T[pi_u]), pi_u)
+        # Draw num. blocks to sample per unique prob.
+        T_u = [item for item in T[pi_u]]
+        n_u = np.random.binomial(len(T_u), pi_u)  # (5)
+        # n_u = np.random.binomial(len(T[pi_u]), pi_u)
 
-        for j, psi_j in enumerate(psi):
-            # fraction of possible edges leading to rho_IN
-            e_j = beta[j] * n_u
+        e = []
+        for j, psi_j in enumerate(psi):  # (6)
+            # (7) fraction of possible edges leading to rho_IN
+            e.append(beta[j] * n_u)
 
-        # Determing A_jk --
+        # (8) Determing A_jk --
         # Num. descendant edges of type psi_j in psi
         # per position t_k in T_u
 
+        # TODO: change from T_u to N_omega
+        # rows are for each edge-type psi_j
+        # cols are for each location t_k in T_u
+        A = [[len(t_k[psi_j]) for t_k in T[pi_u]] for psi_j in psi]
 
-def get_unique_prob_block_location(model, thetaG, block_l):
+        # A = []
+        # for psi_j in psi:
+        #     A_j = []
+        #     for t_k in T[pi_u]:
+        #         A_jk = len(t_k[psi_j])
+        #         A_j.append(A_jk)
+        #     A.append(A_j)
+
+        ub = []
+        for k, t_k in enumerate(T[pi_u]):  # (9)
+            ub_k = sum([A[j][k] for j in range(len(psi))])
+            ub.append(ub_k)
+
+        # (11) TODO: (REVISE) solve linear equation
+        c = np.array([[-1 * item for item in row] for row in A])
+        Aeq = np.ones((1, len(T[pi_u])))
+        beq = np.array([n_u])
+        bounds = np.array([(0, ub_k) for ub_k in ub])
+        linprog(c=c, A_ub=np.array(A), b_ub=np.array(e),
+                A_eq=Aeq, b_eq=beq, bounds=bounds,
+                method='interior-point')
+
+
+        # (12) TODO: sample block
+        for k in range(len(T[pi_u])):
+            # (13) Sampling X_j blocks at random from ub_j places
+            possible_blocks = list()
+            b_prime_sample = None
+            b_lplus1_sample = None  # (14)
+
+def get_unique_prob_block_location(model, thetaG, block_l, l, psi, xOut):
     if model['name'] == "mKPGM":
         # Calc U (set unique probabilities), use node attributes
         # For mKPGM it's just the theta[i][j] values
@@ -358,23 +402,34 @@ def get_unique_prob_block_location(model, thetaG, block_l):
         U = [i for row in thetaG for i in row]
 
         # Index T by probability (pi_u)
-        # T = dict.fromkeys(U, dict.fromkeys(psi, list()))
-        T = dict.fromkeys(U, list())
+        T = dict.fromkeys(U, dict.fromkeys(psi, list()))
+        # T = dict.fromkeys(U, list())
 
         b = model['b']
 
         # get indices for edges (non-zero probability)
         for prob in block_l.keys():    # these correspond to theta values for mKPGM
-            for s,t in block_l[prob]:
-                # map i,j from block[l] to u,v in E_OUT
-                for i in range(b):
-                    for j in range(b):
-                        u = s * b + i
-                        v = t * b + j
-                        # edge_type = (xOut[i], xOut[j])
-                        block_loc = (u, v)
-                        # T[prob][edge_type].append(edge_loc)
-                        T[prob].append(block_loc)
+            blocks = list(block_l[prob])  # TODO: how do I init this???
+            for k in range(model['K'] - l - 1):  # TODO: this goes here?
+                for s,t in blocks:
+                    # map i,j from block[l] to u,v in E_OUT
+                    # TODO: need to iterate over this K - l - 1 times to get vertices
+
+                    blocks = [(s * b + i, t * b + j) for i in range(b) for j in range(b)]
+
+                    for i in range(b):
+                        for j in range(b):
+                            u = s * b + i
+                            v = t * b + j
+
+                            block_loc = (u, v)
+
+                            # descendent edge
+                            edge_type = (xOut[u], xOut[v])
+
+                            T[prob][edge_type].append(block_loc)
+
+                            # T[prob].append(block_loc)
 
         return U, T
     else:
