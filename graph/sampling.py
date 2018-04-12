@@ -92,7 +92,7 @@ def graph_sampling(graphIn, xIn, model, epsilon, distribution, params_test=None)
     if params_test and "last_block" in params_test and params_test["last_block"]:
         verticesOut, edgesOut = maxent_edge_sampling(model, thetaG, params_test["last_block"], psi, beta, xOut)
     else:
-        verticesOut, edgesOut = maxent_edge_sampling(model, thetaG, graphOut.blocks[-1], psi, beta, xOut)
+        verticesOut, edgesOut = maxent_edge_sampling(model, thetaG, graphOut.blocks[-1], model['l'], psi, beta, xOut)
 
     # verticesOut, edgesOut = maxent_edge_sampling(model, thetaG, graphOut.blocks[-1], psi, beta, xOut)
     graphOut.edges = edgesOut
@@ -346,7 +346,8 @@ def lp_block_search(model, thetaG, blockSample_l, l, psi, beta, xOut):
     # (4)
     for u, pi_u in enumerate(U):
         # Draw num. blocks to sample per unique prob.
-        T_u = [item for item in T[pi_u]]
+        # T_u = [item for item in T[pi_u]]
+        T_u = [t_k[psi_j] for t_k in T[pi_u] for psi_j in psi]
         n_u = np.random.binomial(len(T_u), pi_u)  # (5)
         # n_u = np.random.binomial(len(T[pi_u]), pi_u)
 
@@ -362,7 +363,7 @@ def lp_block_search(model, thetaG, blockSample_l, l, psi, beta, xOut):
         # TODO: change from T_u to N_omega
         # rows are for each edge-type psi_j
         # cols are for each location t_k in T_u
-        A = [[len(t_k[psi_j]) for t_k in T[pi_u]] for psi_j in psi]
+        A = [[len(t_k[psi_j]) for t_k in T_u] for psi_j in psi]
 
         # A = []
         # for psi_j in psi:
@@ -373,24 +374,25 @@ def lp_block_search(model, thetaG, blockSample_l, l, psi, beta, xOut):
         #     A.append(A_j)
 
         ub = []
-        for k, t_k in enumerate(T[pi_u]):  # (9)
+        for k, t_k in enumerate(T_u):  # (9)
             ub_k = sum([A[j][k] for j in range(len(psi))])
             ub.append(ub_k)
 
         # (11) TODO: (REVISE) solve linear equation
         c = np.array([[-1 * item for item in row] for row in A])
-        Aeq = np.ones((1, len(T[pi_u])))
+        Aeq = np.ones((1, len(T_u)))
         beq = np.array([n_u])
         bounds = np.array([(0, ub_k) for ub_k in ub])
-        linprog(c=c, A_ub=np.array(A), b_ub=np.array(e),
+        chi = linprog(c=c, A_ub=np.array(A), b_ub=np.array(e),
                 A_eq=Aeq, b_eq=beq, bounds=bounds,
                 method='interior-point')
 
 
         # (12) TODO: sample block
-        for k in range(len(T[pi_u])):
+        for k, t_k in enumerate(T_u):
             # (13) Sampling X_j blocks at random from ub_j places
-            possible_blocks = list()
+            # t_k is one location from T_u
+            possible_blocks = list(t_k)
             b_prime_sample = None
             b_lplus1_sample = None  # (14)
 
@@ -426,9 +428,7 @@ def get_unique_prob_block_location(model, thetaG, block_l, l, psi, xOut):
 
                             # descendent edge
                             edge_type = (xOut[u], xOut[v])
-
                             T[prob][edge_type].append(block_loc)
-
                             # T[prob].append(block_loc)
 
         return U, T
