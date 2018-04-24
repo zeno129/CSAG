@@ -1,4 +1,5 @@
 import random
+# import math
 import numpy as np
 import itertools
 from scipy.stats.stats import pearsonr
@@ -6,15 +7,15 @@ from scipy.optimize import linprog
 from kronecker import mKPGM as mKPGM
 
 
-def graph_sampling(graphIn, xIn, model, epsilon, distribution, params_test=None):
+def graph_sampling(graph_in, x_in, model, epsilon, distribution, params_test=None):
     """
     Graph Sampling algorithm
 
-    :param graphIn: contains list of vertices and list of edges
-    :type graphIn: tuple
+    :param graph_in: contains list of vertices and list of edges
+    :type graph_in: tuple
 
-    :param xIn: node attributes for graphIn
-    :type xIn: list
+    :param x_in: node attributes for graph_in
+    :type x_in: list
 
     :param model: GNM and parameters
     :type model: dict
@@ -24,54 +25,59 @@ def graph_sampling(graphIn, xIn, model, epsilon, distribution, params_test=None)
 
     :param distribution: "binomial" or "multinomial:
     :type distribution: String
+
+    :param params_test: additional parameters for testing this code
     
-    :return: graphOut (graph), xOut (attributes), rhoOut (correlation)
+    :return: graphOut (graph), x_out (attributes), rhoOut (correlation)
     :rtype: tuple, list, float
     """
 
-    verticesIn, edgesIn = graphIn
+    verticesIn, edgesIn = graph_in
 
     # model = ??? -- is this just b and l? ...since theta and K can be learned
-    # thetaG=None, beta=None
-    # TODO (1) learn parameters
+    # theta_g=None, beta=None
+    # TODO (3) learn parameters
 
     # TODO: testing code
     psi = [(0, 0), (0, 1), (1, 0), (1, 1)]
-    # psi = list(itertools.product(thetaX.keys(), repeat=2))
+    # psi = list(itertools.product(theta_x.keys(), repeat=2))
 
     if params_test:
         # if "beta" in params_test.keys():
         beta = params_test["beta"]
 
-        # if "thetaG" in params_test.keys():
-        thetaG = params_test["thetaG"]
-        thetaX = f_x(xIn, distribution)
+        # if "theta_g" in params_test.keys():
+        theta_g = params_test["theta_g"]
+        theta_x = f_x(x_in, distribution)
 
     else:
-        psi, beta, thetaX, thetaG = learn_parameters(graphIn, xIn, model, distribution)
+        psi, beta, theta_x, theta_g = learn_parameters(graph_in, x_in, model, distribution)
 
     if not params_test:
-        psi, beta, thetaX, thetaG = learn_parameters(graphIn, xIn, model, distribution)
+        psi, beta, theta_x, theta_g = learn_parameters(graph_in, x_in, model, distribution)
         n = pow(model['b'], model['K'])
-        # (2) sample node attributes xOut from P(X|thetaX)
-        xOut = sample_x(thetaX, distribution, n)
+        # (4) sample node attributes x_out from P(X|theta_x)
+        x_out = sample_x(theta_x, distribution, n)
     else:
         # if "beta" in params_test.keys():
         beta = params_test["beta"]
 
-        # if "thetaG" in params_test.keys():
-        thetaG = params_test["thetaG"]
-        thetaX = f_x(xIn, distribution)
+        # if "theta_g" in params_test.keys():
+        theta_g = params_test["theta_g"]
+        theta_x = f_x(x_in, distribution)
         # TODO: add param to hardcode or sample
-        xOut = xIn
+        x_out = x_in
 
-    # thetaG = [[0.7, 0.4], [0.4, 0.5]]
-    # graphOut = model.mKPGM(thetaG, K=5, b=2, l=2)
+    # theta_g = [[0.7, 0.4], [0.4, 0.5]]
+    # graphOut = model.mKPGM(theta_g, K=5, b=2, l=2)
 
-    # (3) init rhoOut = (correlation) and l_o = K - l - 1
+    # (5) init rhoOut = (correlation) and l_o = K - l - 1
     rhoOut = np.inf
+    rhoIn = calc_correlation(edgesIn, x_in)
+
     if model['name'] == "mKPGM":
-        l_o = model['K'] - model['l'] - 1
+        # l_o = model['K'] - model['l'] - 1
+        l_o = model['l'] - 1
     else:
         # TODO: implement for KPGM
         raise NotImplemented
@@ -79,44 +85,55 @@ def graph_sampling(graphIn, xIn, model, epsilon, distribution, params_test=None)
     # l has to be specified
     # rho_OUT = np.inf
     # l_o = K - l - 1
-    # TODO: (4) while loop --
-    # TODO: (5-8) block sampling with ME and LP
 
-    # (5) sample last block
+    # Init graphOut
     # TODO: implement for KPGM
-    # g = mKPGM.mKPGM(thetaG, model['K'], model['b'], model['l'])
-    graphOut = mKPGM.mKPGM(thetaG, model['K'], len(thetaG[0]), model['l'])
+    # g = mKPGM.mKPGM(theta_g, model['K'], model['b'], model['l'])
+    graphOut = None
+
     # (8) sample edges
 
-    # TODO: testing version
-    if params_test and "last_block" in params_test and params_test["last_block"]:
-        verticesOut, edgesOut = maxent_edge_sampling(model, thetaG, params_test["last_block"], psi, beta, xOut)
-    else:
-        verticesOut, edgesOut = maxent_edge_sampling(model, thetaG, graphOut.blocks[-1], model['l'], psi, beta, xOut)
+    # TODO: (6) while loop --
+    while (np.isnan(rhoOut) or np.isinf(abs(rhoOut - rhoIn))) and \
+            abs(rhoOut - rhoIn) > epsilon and l_o >= 0:
+        graphOut = mKPGM.mKPGM(theta_g, model['K'], len(theta_g[0]), model['l'])
 
-    # verticesOut, edgesOut = maxent_edge_sampling(model, thetaG, graphOut.blocks[-1], psi, beta, xOut)
-    graphOut.edges = edgesOut
+        # TODO: (8-9) block sampling with LP
+        # for l in range(l_o + 1, model['K'] - model['l'] - 1):
+        for l in range(l_o + 1, model['l'] - 1):
+            idx = l - 1 - model['l']
+            last = lp_block_search(model, theta_g, graphOut.blocks[idx], model['l'], psi, beta, x_out)
+        # (10) sample last block
+        # TODO: testing version
+        if params_test and "last_block" in params_test and params_test["last_block"]:
+            verticesOut, edgesOut = maxent_edge_sampling(model, theta_g, params_test["last_block"], psi, beta, x_out)
+        else:
+            verticesOut, edgesOut = maxent_edge_sampling(model, theta_g, graphOut.blocks[-1], model['l'], psi, beta, x_out)
 
-    # TODO: (9) calculate rhoOut
-    # Initial version
-    # TODO: use graphOut.edges
-    rhoOut = calc_correlation(graphOut.edges, xOut)
-    # rhoOut = calc_correlation(edgesIn, xOut)
+        # verticesOut, edgesOut = maxent_edge_sampling(model, theta_g, graphOut.blocks[-1], psi, beta, x_out)
+        graphOut.edges = edgesOut
 
-    # TODO: (10) update l_o
+        # TODO: (11) calculate rhoOut
+        # Initial version
+        # TODO: use graphOut.edges
+        rhoOut = calc_correlation(graphOut.edges, x_out)
+        # rhoOut = calc_correlation(edgesIn, x_out)
 
-    return graphOut, xOut
-    # return graphIn, xOut
+        # TODO: (12) update l_o
+        l_o = l_o - 1
+
+    return graphOut, x_out
+    # return graph_in, x_out
 
 
-def learn_parameters(graphIn, xIn, model, distribution):
+def learn_parameters(graph_in, x_in, model, distribution):
     """
 
-    :param graphIn: contains list of vertices and edges
-    :type graphIn: tuple
+    :param graph_in: contains list of vertices and edges
+    :type graph_in: tuple
 
-    :param xIn: node attributes for graphIn
-    :type xIn: list
+    :param x_in: node attributes for graph_in
+    :type x_in: list
 
     :param model: GNM and parameters
     :type model: dict
@@ -125,51 +142,51 @@ def learn_parameters(graphIn, xIn, model, distribution):
     :type distribution: String
 
     :return: psi (edge types), beta (fraction of edge types),
-    thetaX (parameters for P(X)), thetaG (parameters for P(G))
+    theta_x (parameters for P(X)), theta_g (parameters for P(G))
     :rtype: list of tuples, dictionary, dictionary, matrix
     """
-    # TODO: (1) learn parameters (psi, beta, thetaX, thetaG)
+    # TODO: (1) learn parameters (psi, beta, theta_x, theta_g)
     # TODO: do I need model in here??
     psi = None
     beta = None
-    thetaX = f_x(xIn, distribution)
-    thetaG = [[0.7, 0.4], [0.4, 0.5]]
+    theta_x = f_x(x_in, distribution)
+    theta_g = [[0.7, 0.4], [0.4, 0.5]]
 
-    return psi, beta, thetaX, thetaG
+    return psi, beta, theta_x, theta_g
 
 
-def f_x(xIn, distribution):
+def f_x(x_in, distribution):
     """
-    function to learn thetaX parameters for P(X)
+    function to learn theta_x parameters for P(X)
 
-    :param xIn: attributes for vertices of graphIn
-    :type xIn: list
+    :param x_in: attributes for vertices of graph_in
+    :type x_in: list
 
     :param distribution: "binomial" or "multinomial:
     :type distribution: String
 
     :return:
     """
-    # (1) learn parameters thetaX
+    # (1) learn parameters theta_x
 
     if distribution in ["binomial", "multinomial"]:
-        labels = list(set(xIn))
-        thetaX = {}
+        labels = list(set(x_in))
+        theta_x = {}
 
         for l in labels:
-            thetaX[l] = float(xIn.count(l)) / len(xIn)
+            theta_x[l] = float(x_in.count(l)) / len(x_in)
 
-        return thetaX
+        return theta_x
     else:
         raise ValueError("Supported distributions are 'binomial' and 'multinomial'")
 
 
-def sample_x(thetaX, distribution, num_samples):
+def sample_x(theta_x, distribution, num_samples):
     """
-    Sample node attributes xOut from P(X|thetaX)
+    Sample node attributes x_out from P(X|theta_x)
 
-    :param thetaX: parameters for P(X)
-    :type thetaX: dictionary
+    :param theta_x: parameters for P(X)
+    :type theta_x: dictionary
 
     :param distribution: "binomial" or "multinomial:
     :type distribution: String
@@ -177,31 +194,31 @@ def sample_x(thetaX, distribution, num_samples):
     :param num_samples: number of samples
     :type num_samples: int
 
-    :return: xOut (new attributes for graphOut)
+    :return: x_out (new attributes for graphOut)
     :rtype: list
     """
 
     if distribution in ["binomial", "multinomial"]:
-        labels = thetaX.keys()
-        probabilities = [thetaX[l] for l in labels]
+        labels = theta_x.keys()
+        probabilities = [theta_x[l] for l in labels]
 
         # tmp = np.random.multinomial(n=(len(labels) - 1), pvals=probabilities, size=num_samples)
         tmp = np.random.multinomial(n=1, pvals=probabilities, size=num_samples)
-        xOut = [t[0] for t in tmp]
+        x_out = [t[0] for t in tmp]
 
-        return xOut
+        return x_out
     else:
         raise ValueError("Supported distributions are 'binomial' and 'multinomial'")
 
 
-def maxent_edge_sampling(model, thetaG, block, l, psi, beta, xOut):
+def maxent_edge_sampling(model, theta_g, block, l, psi, beta, x_out):
     """
 
     :param model: GNM and parameters
     :type model: dict
 
-    :param thetaG: parameters for marginal distribution of network structure P(G)
-    :type thetaG: matrix
+    :param theta_g: parameters for marginal distribution of network structure P(G)
+    :type theta_g: matrix
 
     :param block: sample block from penultimate iteration of mKPGM
     :type block: matrix
@@ -212,8 +229,8 @@ def maxent_edge_sampling(model, thetaG, block, l, psi, beta, xOut):
     :param beta: fraction of edges of each type
     :type beta: list
 
-    :param xOut: node attributes
-    :type xOut: list
+    :param x_out: node attributes
+    :type x_out: list
 
     :return: graphOut (output graph, contains num. of vertices and edge list)
     :rtype: tuple
@@ -221,7 +238,7 @@ def maxent_edge_sampling(model, thetaG, block, l, psi, beta, xOut):
     # U = unique probabilities
     # T = edge locations
     # (3)
-    U, T = get_unique_prob_edge_location(model, thetaG, block, psi, xOut)
+    U, T = get_unique_prob_edge_location(model, theta_g, block, psi, x_out)
     # N_e = 0
     Nus = []
 
@@ -262,14 +279,14 @@ def maxent_edge_sampling(model, thetaG, block, l, psi, beta, xOut):
     return vertices, E_OUT
 
 
-def get_unique_prob_edge_location(model, thetaG, block, psi, xOut):
+def get_unique_prob_edge_location(model, theta_g, block, psi, x_out):
     """
 
     :param model: GNM and parameters
     :type model: dict
 
-    :param thetaG: parameters for marginal distribution of network structure P(G)
-    :type thetaG: matrix
+    :param theta_g: parameters for marginal distribution of network structure P(G)
+    :type theta_g: matrix
 
     :param block: sample block from penultimate iteration of mKPGM
     :type block: dict
@@ -277,8 +294,8 @@ def get_unique_prob_edge_location(model, thetaG, block, psi, xOut):
     :param psi: edge types
     :type psi: list
 
-    :param xOut: node attributes
-    :type xOut: list
+    :param x_out: node attributes
+    :type x_out: list
 
     :return: U (unique probabilities), T (edge locations)
     :rtype: set, matrix
@@ -287,8 +304,8 @@ def get_unique_prob_edge_location(model, thetaG, block, psi, xOut):
     if model['name'] == "mKPGM":
         # Calc U (set unique probabilities), use node attributes
         # For mKPGM it's just the theta[i][j] values
-        # U = thetaG.flatten()
-        U = [i for row in thetaG for i in row]
+        # U = theta_g.flatten()
+        U = [i for row in theta_g for i in row]
 
         # Index T by probability (pi_u) and edge-type (psi)
         T = dict.fromkeys(U, dict.fromkeys(psi, list()))
@@ -304,7 +321,7 @@ def get_unique_prob_edge_location(model, thetaG, block, psi, xOut):
                         u = s * b + i
                         v = t * b + j
 
-                        edge_type = (xOut[u], xOut[v])
+                        edge_type = (x_out[u], x_out[v])
                         edge_loc = (u, v)
                         T[prob][edge_type].append(edge_loc)
 
@@ -314,16 +331,16 @@ def get_unique_prob_edge_location(model, thetaG, block, psi, xOut):
         raise NotImplemented
 
 
-def lp_block_search(model, thetaG, blockSample_l, l, psi, beta, xOut):
+def lp_block_search(model, theta_g, block_sample_l, l, psi, beta, x_out):
     """
 
     :param model: GNM and parameters
     :type model: dict
 
-    :param thetaG: parameters for marginal distribution of network structure P(G)
-    :type thetaG: matrix
+    :param theta_g: parameters for marginal distribution of network structure P(G)
+    :type theta_g: matrix
 
-    :param blockSample_l: sample block from l-th iteration of mKPGM
+    :param block_sample_l: sample block from l-th iteration of mKPGM
     :type block: matrix
 
     :param psi: edge types
@@ -332,22 +349,22 @@ def lp_block_search(model, thetaG, blockSample_l, l, psi, beta, xOut):
     :param beta: fraction of edges of each type
     :type beta: list
 
-    :param xOut: node attributes
-    :type xOut: list
+    :param x_out: node attributes
+    :type x_out: list
 
     :return:
         :blockSample_lPlus1: sampled block in l+1
     """
 
     # (3)
-    U, T = get_unique_prob_block_location(model, thetaG, blockSample_l, l, psi, xOut)
+    U, T = get_unique_prob_block_location(model, theta_g, block_sample_l, l, psi, x_out)
 
     # for each unique prob. pi_u
     # (4)
     for u, pi_u in enumerate(U):
         # Draw num. blocks to sample per unique prob.
-        # T_u = [item for item in T[pi_u]]
-        T_u = [t_k[psi_j] for t_k in T[pi_u] for psi_j in psi]
+        T_u = [item for item in T[pi_u]]
+        # T_u = [t_k[psi_j] for t_k in T[pi_u] for psi_j in psi]
         n_u = np.random.binomial(len(T_u), pi_u)  # (5)
         # n_u = np.random.binomial(len(T[pi_u]), pi_u)
 
@@ -363,7 +380,8 @@ def lp_block_search(model, thetaG, blockSample_l, l, psi, beta, xOut):
         # TODO: change from T_u to N_omega
         # rows are for each edge-type psi_j
         # cols are for each location t_k in T_u
-        A = [[len(t_k[psi_j]) for t_k in T_u] for psi_j in psi]
+        # A = [[len(t_k[psi_j]) for t_k in T_u] for psi_j in psi]
+        A = determine_matrix_a(model, psi, T_u, l, x_out)
 
         # A = []
         # for psi_j in psi:
@@ -395,46 +413,98 @@ def lp_block_search(model, thetaG, blockSample_l, l, psi, beta, xOut):
             possible_blocks = list(t_k)
             b_prime_sample = None
             b_lplus1_sample = None  # (14)
+    # TODO: return blocks, this is just placeholder for now
+    return (None, None)
 
-def get_unique_prob_block_location(model, thetaG, block_l, l, psi, xOut):
+
+def determine_matrix_a(model, psi, T_u, l, x_out):
+    # init A to all zeros
+    # A is |phi| x |T_u| (originally)
+    a = np.zeros((len(psi), len(T_u)))
+    b = model['b']
+    cnt_edges = []
+
+    for k, t_k in enumerate(T_u):
+        s, t = t_k
+        prev_level = [(s, t)]
+        curr_edges = []
+
+        # calculate edges
+        for itr in range(model['K'] - l):
+            for s, t in prev_level:
+                curr_edges = [(s * b + i, t * b + j) for i in range(b) for j in range(b)]
+            prev_level = list(curr_edges)
+
+        # iterate over edges, get edge types and add to A
+        for u, v in curr_edges:
+            # descendant edge
+            edge_type = (x_out[u], x_out[v])
+            j = psi.index(edge_type)
+            a[j][k] += 1
+
+        c_k = [a[j][k] for j in range(len(psi))]
+        cnt_edges.append(c_k)
+
+    # Reverse lookup for configurations
+    configs = dict.fromkeys(cnt_edges, list())
+    for k, c_k in enumerate(cnt_edges):
+        configs[c_k].append(T_u[k])
+
+
+    # Create a list of lists, then convert to set
+
+    unique_a_transp = unique_rows(a.T)
+    
+    return unique_a_transp.T, configs
+
+
+def get_unique_prob_block_location(model, theta_g, block_l, l, psi, x_out):
     if model['name'] == "mKPGM":
         # Calc U (set unique probabilities), use node attributes
         # For mKPGM it's just the theta[i][j] values
-        # U = thetaG.flatten()
-        U = [i for row in thetaG for i in row]
+        # U = theta_g.flatten()
+        U = [i for row in theta_g for i in row]
 
         # Index T by probability (pi_u)
-        T = dict.fromkeys(U, dict.fromkeys(psi, list()))
-        # T = dict.fromkeys(U, list())
+        # T = dict.fromkeys(U, dict.fromkeys(psi, list()))
+        T = dict.fromkeys(U, list())
 
         b = model['b']
 
         # get indices for edges (non-zero probability)
         for prob in block_l.keys():    # these correspond to theta values for mKPGM
-            blocks = list(block_l[prob])  # TODO: how do I init this???
-            for k in range(model['K'] - l - 1):  # TODO: this goes here?
-                for s,t in blocks:
-                    # map i,j from block[l] to u,v in E_OUT
-                    # TODO: need to iterate over this K - l - 1 times to get vertices
+            # blocks = list(block_l[prob])  # TODO: how do I init this???
+            # for k in range(model['K'] - l - 1):  # TODO: this goes here?
+            #     for s,t in blocks:
+            for s,t in block_l[prob]:
+                # map i,j from block[l] to u,v in E_OUT
+                # Don't need to iterate over this K - l - 1 times to get vertices
 
-                    blocks = [(s * b + i, t * b + j) for i in range(b) for j in range(b)]
+                # blocks = [(s * b + i, t * b + j) for i in range(b) for j in range(b)]
 
-                    for i in range(b):
-                        for j in range(b):
-                            u = s * b + i
-                            v = t * b + j
+                for i in range(b):
+                    for j in range(b):
+                        u = s * b + i
+                        v = t * b + j
 
-                            block_loc = (u, v)
+                        block_loc = (u, v)
 
-                            # descendent edge
-                            edge_type = (xOut[u], xOut[v])
-                            T[prob][edge_type].append(block_loc)
-                            # T[prob].append(block_loc)
+                        # descendant edge
+                        # edge_type = (x_out[u], x_out[v])
+                        # T[prob][edge_type].append(block_loc)
+                        T[prob].append(block_loc)
 
         return U, T
     else:
         # TODO: calc U and T for KPGM
         raise NotImplemented
+
+
+def unique_rows(a):
+    # https://stackoverflow.com/a/8567929/6846164
+    a = np.ascontiguousarray(a)
+    unique_a = np.unique(a.view([('', a.dtype)]*a.shape[1]))
+    return unique_a.view(a.dtype).reshape((unique_a.shape[0], a.shape[1]))
 
 
 def calc_correlation(edges, labels):
