@@ -105,13 +105,15 @@ def test_graph_sampling_binomial_dumb_no_learning():
     Use binomial distribution.
     """
     b = 2
-    k = 3
     # k = 10
-    l = 2
+    # k = 3
+    # l = 2
+    k = 5
+    l = 3
     theta = [[0.7, 0.4], [0.4, 0.5]]
     n = pow(b, k)
 
-    # g = model.mKPGM(theta, k, b, l)
+    g = model.mKPGM(theta, k, b, l)
     mymodel = {'name': "mKPGM", 'K': k, 'b': b, 'l': l, 'theta': theta}
     # x = list(np.random.random_integers(low=0, high=1, size=n))
 
@@ -129,10 +131,11 @@ def test_graph_sampling_binomial_dumb_no_learning():
              [0.05, 0.45, 0.45, 0.05]]
     for beta in tries:
         params_test = {"beta": beta, "thetaG": theta, "last_block": False}
-        graphOut, xOut = sampling.graph_sampling(graphIn=(None, None),
+        # graphOut, xOut = sampling.graph_sampling(graphIn=(None, None),
+        graphOut, xOut = sampling.graph_sampling(graphIn=(g.vertices, g.edges),
                                                 xIn=x,
                                                 model=mymodel,
-                                                epsilon=0.0,
+                                                epsilon=0.1,
                                                 distribution="binomial",
                                                 params_test=params_test)
 
@@ -153,60 +156,61 @@ def test_graph_sampling_binomial_dumb_no_learning():
     assert xOut.count(1) >= mean - variance
 
 
-def test_graph_sampling_binomial_no_learning():
-    """
-    Test dumb version:
-    Create graph and get random attributes back.
-    Use binomial distribution.
-    """
-    b = 2
-    k = 3
-    # k = 10
-    l = 2
-    theta = [[0.7, 0.4], [0.4, 0.5]]
-    n = pow(b, k)
-
-    # g = model.mKPGM(theta, k, b, l)
-    mymodel = {'name': "mKPGM", 'K': k, 'b': b, 'l': l, 'theta': theta}
-
-    # x = list(np.random.random_integers(low=0, high=1, size=n))
-
-    x = [0] * (n / 2)
-    x.extend([1] * (n / 2))
-    # random.shuffle(x)
-
-    # TODO: specify beta directly
-    # beta = fraction of edges of each type
-    tries = [[0.25, 0.25, 0.25, 0.25],
-             # [0.4375, 0.125, 0.125, 0.4375],
-             [0.45, 0.05, 0.05, 0.45],
-             [0.48, 0.01, 0.01, 0.48],
-             [0.97, 0.01, 0.01, 0.01],
-             [0.05, 0.45, 0.45, 0.05]]
-    for beta in tries:
-        params_test = {"beta": beta, "thetaG": theta, "last_block": False}
-        graphOut, xOut = sampling.graph_sampling(graphIn=(None, None),
-                                                xIn=x,
-                                                model=mymodel,
-                                                epsilon=0.0,
-                                                distribution="binomial",
-                                                params_test=params_test)
-
-        with open("correlations.txt", "a") as myfile:
-            corr = calc_correlation(graphOut.edges, xOut)
-            myfile.write("beta = {}\t\tcorrelation = {}\n\n".format(beta, corr))
-
-    # TODO: calculate with graphOut
-    p = 0.5
-    mean = n * p
-    variance = mean * (1 - p)
-
-    # TODO: figure out how to test correlation
-    assert len(xOut) == n
-
-    # assert calc_correlation(graphOut[1], xOut) == 0.5
-    assert xOut.count(1) <= mean + variance
-    assert xOut.count(1) >= mean - variance
+# def test_graph_sampling_binomial_no_learning():
+#     """
+#     Test dumb version:
+#     Create graph and get random attributes back.
+#     Use binomial distribution.
+#     """
+#     b = 2
+#     k = 3
+#     # k = 10
+#     l = 2
+#     theta = [[0.7, 0.4], [0.4, 0.5]]
+#     n = pow(b, k)
+#
+#     g = model.mKPGM(theta, k, b, l)
+#     mymodel = {'name': "mKPGM", 'K': k, 'b': b, 'l': l, 'theta': theta}
+#
+#     # x = list(np.random.random_integers(low=0, high=1, size=n))
+#
+#     x = [0] * (n / 2)
+#     x.extend([1] * (n / 2))
+#     # random.shuffle(x)
+#
+#     # TODO: specify beta directly
+#     # beta = fraction of edges of each type
+#     tries = [[0.25, 0.25, 0.25, 0.25],
+#              # [0.4375, 0.125, 0.125, 0.4375],
+#              [0.45, 0.05, 0.05, 0.45],
+#              [0.48, 0.01, 0.01, 0.48],
+#              [0.97, 0.01, 0.01, 0.01],
+#              [0.05, 0.45, 0.45, 0.05]]
+#     for beta in tries:
+#         params_test = {"beta": beta, "thetaG": theta, "last_block": False}
+#         # graphOut, xOut = sampling.graph_sampling(graphIn=(None, None),
+#         graphOut, xOut = sampling.graph_sampling(graphIn=(g.vertices, g.edges),
+#                                                 xIn=x,
+#                                                 model=mymodel,
+#                                                 epsilon=0.1,
+#                                                 distribution="binomial",
+#                                                 params_test=params_test)
+#
+#         with open("correlations.txt", "a") as myfile:
+#             corr = calc_correlation(graphOut.edges, xOut)
+#             myfile.write("beta = {}\t\tcorrelation = {}\n\n".format(beta, corr))
+#
+#     # TODO: calculate with graphOut
+#     p = 0.5
+#     mean = n * p
+#     variance = mean * (1 - p)
+#
+#     # TODO: figure out how to test correlation
+#     assert len(xOut) == n
+#
+#     # assert calc_correlation(graphOut[1], xOut) == 0.5
+#     assert xOut.count(1) <= mean + variance
+#     assert xOut.count(1) >= mean - variance
 
 
 # def test_multiple_random_graphs():

@@ -3,7 +3,7 @@ import random
 import numpy as np
 import itertools
 from scipy.stats.stats import pearsonr
-from scipy.optimize import linprog
+from scipy.optimize import linprog, minimize
 from kronecker import mKPGM as mKPGM
 
 
@@ -343,6 +343,9 @@ def lp_block_search(model, theta_g, block_sample_l, l, psi, beta, x_out):
     :param block_sample_l: sample block from l-th iteration of mKPGM
     :type block: matrix
 
+    :param l: current level
+    :type l: int
+
     :param psi: edge types
     :type psi: list
 
@@ -372,24 +375,13 @@ def lp_block_search(model, theta_g, block_sample_l, l, psi, beta, x_out):
         for j, psi_j in enumerate(psi):  # (6)
             # (7) fraction of possible edges leading to rho_IN
             e.append(beta[j] * n_u)
+        e = np.array(e)
 
         # (8) Determing A_jk --
         # Num. descendant edges of type psi_j in psi
         # per position t_k in T_u
-
-        # TODO: change from T_u to N_omega
-        # rows are for each edge-type psi_j
-        # cols are for each location t_k in T_u
-        # A = [[len(t_k[psi_j]) for t_k in T_u] for psi_j in psi]
-        A = determine_matrix_a(model, psi, T_u, l, x_out)
-
-        # A = []
-        # for psi_j in psi:
-        #     A_j = []
-        #     for t_k in T[pi_u]:
-        #         A_jk = len(t_k[psi_j])
-        #         A_j.append(A_jk)
-        #     A.append(A_j)
+        # A is |psi| x N_omega
+        A, configs = determine_matrix_a(model, psi, T_u, l, x_out)
 
         ub = []
         for k, t_k in enumerate(T_u):  # (9)
@@ -398,12 +390,17 @@ def lp_block_search(model, theta_g, block_sample_l, l, psi, beta, x_out):
 
         # (11) TODO: (REVISE) solve linear equation
         c = np.array([[-1 * item for item in row] for row in A])
-        Aeq = np.ones((1, len(T_u)))
+        Aeq = np.ones(A.shape)
         beq = np.array([n_u])
         bounds = np.array([(0, ub_k) for ub_k in ub])
-        chi = linprog(c=c, A_ub=np.array(A), b_ub=np.array(e),
-                A_eq=Aeq, b_eq=beq, bounds=bounds,
-                method='interior-point')
+        sum_ub = sum(ub)
+        x_init = np.random.multinomial(n_u, [np.divide(ub_j, sum_ub) for ub_j in ub])
+        tmp = minimize(func=f_chi, x0=x_init, args=(x_init, A, e))
+
+        # tmp = minimize(f_chi(x_init, A, e), x_init, (A, e, x_init), method=linprog)
+        # chi = linprog(c=c, A_ub=np.array(A), b_ub=e,
+        #               A_eq=Aeq, b_eq=beq, bounds=bounds,
+        #               method='interior-point')
 
 
         # (12) TODO: sample block
@@ -415,6 +412,12 @@ def lp_block_search(model, theta_g, block_sample_l, l, psi, beta, x_out):
             b_lplus1_sample = None  # (14)
     # TODO: return blocks, this is just placeholder for now
     return (None, None)
+
+
+def f_chi(x, A, e):
+    indicator = [1 if np.dot(A, x) < e else 0]
+    objective = np.multiply(np.sum(e - np.dot(A, x)), indicator)
+    return objective
 
 
 def determine_matrix_a(model, psi, T_u, l, x_out):
@@ -450,12 +453,10 @@ def determine_matrix_a(model, psi, T_u, l, x_out):
     for k, c_k in enumerate(cnt_edges):
         configs[c_k].append(T_u[k])
 
-
-    # Create a list of lists, then convert to set
-
-    unique_a_transp = unique_rows(a.T)
+    # Get unique columns
+    unique_a_transpose = unique_rows(a.T)
     
-    return unique_a_transp.T, configs
+    return unique_a_transpose.T, configs
 
 
 def get_unique_prob_block_location(model, theta_g, block_l, l, psi, x_out):
