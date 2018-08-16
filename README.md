@@ -1,7 +1,7 @@
 # Constrained Sampling for Attributed Graphs (CSAG)
 
 ## Work in progress
-This is still a work in progress for a Collective Classification Python package.
+This is still a work in progress for an attributed graph model.
 
 ## Code license
 This code is released under [BSD v2](LICENSE.md)
