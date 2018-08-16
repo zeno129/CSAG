@@ -4,7 +4,7 @@
 This is still a work in progress for an attributed graph model.
 
 ## Code license
-This code is released under [BSD v2](LICENSE.md)
+This code is released under [BSD v2](LICENSE)
 
 ----
 
